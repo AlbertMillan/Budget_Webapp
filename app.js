@@ -167,6 +167,14 @@ var budgetController = (function() {
             return allPerc;
         },
 
+        getData: function() {
+            return data;
+        },
+
+        setData: function(obj) {
+            data = obj;
+        },
+
         testing: function() {
             console.log(data);
         }
@@ -344,9 +352,75 @@ var UIController = (function() {
 
 
 
-var controller = (function(budgetCtrl, UICtrl) {
+var storageController = (function() {
+
+    var storage = {
+        key: 'data'
+    };
+
+    return {
+        store: function(data) {
+            // 1. Stored in the local storage.
+            localStorage.setItem(storage.key, JSON.stringify(data));
+            this.retrieveItem();
+        },
+
+        retrieveItem: function() {
+            return JSON.parse(localStorage.getItem(storage.key));
+        },
+
+        removeItem: function() {
+            localStorage.removeItem(storage.key);
+        },
+
+        clearData: function() {
+            localStorage.clear();
+        },
+
+        isEmpty: function() {
+            return (localStorage.getItem(storage.key) === null ? true : false);
+        },
+    }
+
+})();
+
+
+
+
+var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
 
     var draggedItem;
+
+    var setupStorage = function() {
+        if(!storageCtrl.isEmpty())
+        {
+            var data = storageCtrl.retrieveItem();
+            budgetCtrl.setData(data);
+            // console.log(data);
+            UICtrl.displayBudget(budgetCtrl.getBudget());
+
+            var addAllItems = function(type) {
+                for(var i=0; i < data.allItems[type].length; i++)
+                {
+                    UICtrl.addListItem(data.allItems[type][i], type);
+                }
+            };
+
+            addAllItems('inc');
+            addAllItems('exp');
+        }
+        else
+        {
+            UICtrl.displayBudget({
+                budget: 0,
+                totalInc: 0,
+                totalExp: 0,
+                percentage: -1
+            });
+        }
+    };
+
+    
 
     var setupEventListeners = function() {
         var DOM = UICtrl.getDOMstrings();
@@ -360,6 +434,10 @@ var controller = (function(budgetCtrl, UICtrl) {
             {
                 console.log('ENTER pressed.');
                 ctrlAddItem();
+            }
+            else if (event.keyCode === 109 || event.which === 109)
+            {
+                storageCtrl.deleteData();
             }
         });
 
@@ -383,6 +461,7 @@ var controller = (function(budgetCtrl, UICtrl) {
 
         // 3. Display the budget on the UI
         UICtrl.displayBudget(budget);
+
     };
 
     var updatePercentages = function() {
@@ -418,6 +497,9 @@ var controller = (function(budgetCtrl, UICtrl) {
 
             // 6. Calculate and update percentages
             updatePercentages();
+
+            // 7. Store data in localstorage
+            storageCtrl.store(budgetCtrl.getData());
         }
         
 
@@ -448,20 +530,17 @@ var controller = (function(budgetCtrl, UICtrl) {
 
             // 4. Update and show percentages.
             updatePercentages();
-        }
 
-        
+            // 5. Store data in localstorage
+            storageCtrl.store(budgetCtrl.getData());
+        }
     };
 
     // Event when dragged over an element. Check coordinates. - dragStart
     var ctrlDragItem = function(event) {
         var itemID, splitID;
-        // console.log(event);
-        // console.log(event.target);
 
         itemID = event.target.id;
-        // containerType = event.target.parentNode.parentNode.classList.value;
-        // console.log(containerType);
 
         // Repeated code in method above...
         splitID = itemID.split('-');
@@ -469,7 +548,6 @@ var controller = (function(budgetCtrl, UICtrl) {
             type: splitID[0],
             ID: parseInt(splitID[1]),
         }
-        // Return the type of the selected item
         
     };
 
@@ -502,6 +580,9 @@ var controller = (function(budgetCtrl, UICtrl) {
 
             // 5. Update and show percentages.
             updatePercentages();
+
+            // 6. Store data in localstorage
+            storageCtrl.store(budgetCtrl.getData());
         }
     };
 
@@ -509,16 +590,15 @@ var controller = (function(budgetCtrl, UICtrl) {
         init: function() {
             console.log('Application has started.');
             UICtrl.displayMonth();
-            UICtrl.displayBudget({
-                budget: 0,
-                totalInc: 0,
-                totalExp: 0,
-                percentage: -1
-            });
+
+            // Displays last budget stored in the localStorage if any
+            setupStorage();
+            
+            // Prepares event listeners.
             setupEventListeners();
         }
     }
 
-})(budgetController, UIController);
+})(budgetController, UIController, storageController);
 
 controller.init();
