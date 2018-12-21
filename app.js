@@ -35,6 +35,23 @@ var budgetController = (function() {
         data.totals[type] = sum;
     };
 
+    var deleteEl = function(type, index) {
+        if(index !== -1)
+        {
+            // splice - index at which we want to remove. Number of elements to be removed.
+            data.allItems[type].splice(index, 1);
+        }
+    };
+
+    // Returns index of the element with ID.
+    var getIndex = function(type, ID) {
+        // map returns a new brand array of the size of allItems
+        var ids = data.allItems[type].map(function(current) {
+            return current.id;
+        });
+        return ids.indexOf(ID);
+    };
+
 
     var data = {
         allItems: {
@@ -80,19 +97,31 @@ var budgetController = (function() {
         },
 
         deleteItem: function(type, ID) {
-            // map returns a new brand array of the size of allItems
-            var ids = data.allItems[type].map(function(current) {
-                return current.id;
-            });
-
             // Get index of the element to be deleted
-            index = ids.indexOf(ID);
+            index = getIndex(type, ID);
 
-            if(index !== -1)
-            {
-                // splice - index at which we want to remove. Number of elements to be removed.
-                data.allItems[type].splice(index, 1);
-            }
+            // Delete at index
+            deleteEl(type, index);
+        },
+
+        switchItem: function(type, ID) {
+            // Get Item description/value
+            var index, item, inversedType, inversedItem;
+
+            // Get index of item to be switched
+            index = getIndex(type, ID);
+
+            // 1. Get item info (description and value)
+            item = data.allItems[type][index];
+
+            // 2. Create new item with inversed type
+            inversedType = (type === 'inc' ? 'exp' : 'inc');
+            inversedItem = this.addItem(inversedType, item.description, item.value);
+
+            // 3. Delete item at index from the data structure type
+            deleteEl(type, index);
+
+            return inversedItem;
         },
 
         calcBudget: function() {
@@ -163,6 +192,8 @@ var UIController = (function() {
         itemPercentageLabel: '.item__percentage',
         container: '.container',
         monthLabel: '.budget__title--month',
+        incomeContainer: '.income',
+        expenseContainer: '.expenses',
     }
 
     var formatNumber = function(num, type) {
@@ -200,12 +231,12 @@ var UIController = (function() {
             if(type === 'inc')
             {
                 element = DOMstrings.incomeContainer;
-                html = '<div class="item clearfix" id="inc-%id%"><div class="item__description">%description%</div><div class="right clearfix"><div class="item__value">%value%</div><div class="item__delete"><button class="item__delete--btn"><i class="ion-ios-close-outline"></i></button></div></div></div>';
+                html = '<div class="item clearfix" id="inc-%id%" draggable="true"><div class="item__description">%description%</div><div class="right clearfix"><div class="item__value">%value%</div><div class="item__delete"><button class="item__delete--btn"><i class="ion-ios-close-outline"></i></button></div></div></div>';
             }
             else
             {
                 element = DOMstrings.expensesContainer;
-                html = '<div class="item clearfix" id="exp-%id%"><div class="item__description">%description%</div><div class="right clearfix"><div class="item__value">%value%</div><div class="item__percentage">21%</div><div class="item__delete"><button class="item__delete--btn"><i class="ion-ios-close-outline"></i></button></div></div></div>';
+                html = '<div class="item clearfix" id="exp-%id%" draggable="true"><div class="item__description">%description%</div><div class="right clearfix"><div class="item__value">%value%</div><div class="item__percentage">21%</div><div class="item__delete"><button class="item__delete--btn"><i class="ion-ios-close-outline"></i></button></div></div></div>';
             }
 
             // Replace the placeholder text with some actual data
@@ -296,6 +327,14 @@ var UIController = (function() {
             document.querySelector(DOMstrings.inputBtn).classList.toggle('red');
         },
 
+        // Returns the dimensions of the opposite container of column type.
+        getContainerDimensions: function(type) {
+            var label;
+            // label = (type === 'inc' ? DOMstrings.incomeContainer : DOMstrings.expenseContainer);
+            label = (type === 'inc' ? DOMstrings.expenseContainer : DOMstrings.incomeContainer);
+            return document.querySelector(label).getBoundingClientRect();
+        },
+
         getDOMstrings: function() {
             return DOMstrings;
         }
@@ -306,6 +345,8 @@ var UIController = (function() {
 
 
 var controller = (function(budgetCtrl, UICtrl) {
+
+    var draggedItem;
 
     var setupEventListeners = function() {
         var DOM = UICtrl.getDOMstrings();
@@ -323,6 +364,11 @@ var controller = (function(budgetCtrl, UICtrl) {
         });
 
         document.querySelector(DOM.container).addEventListener('click', ctrlDeleteItem);
+
+        // DRAGOVER
+        document.querySelector(DOM.container).addEventListener('dragstart', ctrlDragItem);
+        // document.querySelector(DOM.container).addEventListener('drop', drop);
+        document.querySelector(DOM.container).addEventListener('dragend', ctrlToggleItem);
 
         document.querySelector(DOM.inputType).addEventListener('change', UICtrl.changedType);
     };
@@ -390,19 +436,73 @@ var controller = (function(budgetCtrl, UICtrl) {
             splitID = itemID.split('-');
             type = splitID[0];
             ID = parseInt(splitID[1]);
+
+            // 1. Delete item from the data structure
+            budgetCtrl.deleteItem(type,ID);
+
+            // 2. Delete the item from the UI dragged column
+            UIController.deleteListItem(itemID);
+
+            // 3. Update and show the new budget
+            updateBudget();
+
+            // 4. Update and show percentages.
+            updatePercentages();
         }
 
-        // 1. Delete item from the data structure
-        budgetCtrl.deleteItem(type,ID);
+        
+    };
 
-        // 2. Delete the item from the UI
-        UIController.deleteListItem(itemID);
+    // Event when dragged over an element. Check coordinates. - dragStart
+    var ctrlDragItem = function(event) {
+        var itemID, splitID;
+        // console.log(event);
+        // console.log(event.target);
 
-        // 3. Update and show the new budget
-        updateBudget();
+        itemID = event.target.id;
+        // containerType = event.target.parentNode.parentNode.classList.value;
+        // console.log(containerType);
 
-        // 4. Update and show percentages.
-        updatePercentages();
+        // Repeated code in method above...
+        splitID = itemID.split('-');
+        draggedItem = {
+            type: splitID[0],
+            ID: parseInt(splitID[1]),
+        }
+        // Return the type of the selected item
+        
+    };
+
+    // Event when it drops check square window
+    var ctrlToggleItem = function(event) {
+        var rect, inversedType;
+
+        // 1. Get type of the container where item is dropped (inc/exp)
+        inversedType = (draggedItem.type === 'inc' ? 'exp' : 'inc');
+
+        // 2. Get dimensions of the opposing column.
+        rect = UICtrl.getContainerDimensions(draggedItem.type);
+
+        // Check Square dropped within the container
+        if(event.x >= rect.left && event.x <= rect.right  &&
+           event.y >= rect.top  && event.y <= rect.bottom
+          )
+        {
+            // 1. Switch item in the data structure. Returns the item in the opposite column
+            var newItem = budgetCtrl.switchItem(draggedItem.type, draggedItem.ID);
+
+            // 2. Delete the item from the UI
+            UIController.deleteListItem(draggedItem.type + '-' + draggedItem.ID);
+
+            // 3. Add the item to the UI dropped column
+            UICtrl.addListItem(newItem, inversedType);
+
+            // 4. Update and show the new budget
+            updateBudget();
+
+            // 5. Update and show percentages.
+            updatePercentages();
+        }
     };
 
     return {
