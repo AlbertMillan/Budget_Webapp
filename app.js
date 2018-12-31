@@ -1,3 +1,7 @@
+// TODO
+//  2. Local storage does not display initial percentages correctly,
+
+
 var budgetController = (function() {
     var Expense = function(id, description, value) {
         this.id = id;
@@ -104,6 +108,11 @@ var budgetController = (function() {
             deleteEl(type, index);
         },
 
+        clearItems: function(){
+            data.allItems.inc.length = 0;
+            data.allItems.exp.length = 0;
+        },
+
         switchItem: function(type, ID) {
             // Get Item description/value
             var index, item, inversedType, inversedItem;
@@ -146,6 +155,7 @@ var budgetController = (function() {
         calcPercentages: function() {
 
             data.allItems.exp.forEach(function(current) {
+                console.log(current);
                 current.calculatePercentage(data.totals.inc);
             });
         }, 
@@ -171,8 +181,23 @@ var budgetController = (function() {
             return data;
         },
 
+        // JSON data does not store Expense nor Income objects, create them when
+        //  importing data from the localStorage
         setData: function(obj) {
-            data = obj;
+            type = ['exp','inc'];
+            for(var i=0; i < type.length; i++)
+            {
+                obj.allItems[type[i]].forEach(function(current, index) {
+                    var item = (
+                        type[i] === 'exp' ? 
+                            new Expense(current.id, current.description, current.value) :
+                            new Income(current.id, current.description, current.value)                   
+                    );
+                    data.allItems[type[i]][index] = item;
+                });
+                data.totals[type[i]] = obj.totals[type[i]];
+            }
+            data.budget = obj.budget;
         },
 
         testing: function() {
@@ -191,8 +216,9 @@ var UIController = (function() {
         inputDescripiton: '.add__description',
         inputValue: '.add__value',
         inputBtn: '.add__btn',
-        incomeContainer: '.income__list',
-        expensesContainer: '.expenses__list',
+        resetBtn: '.add__reset__btn',
+        incomeListContainer: '.income__list',
+        expensesListContainer: '.expenses__list',
         budgetLabel: '.budget__value',
         incomeLabel: '.budget__income--value',
         expenseLabel: '.budget__expenses--value',
@@ -238,12 +264,12 @@ var UIController = (function() {
             // Create HTML string with placeholder text
             if(type === 'inc')
             {
-                element = DOMstrings.incomeContainer;
+                element = DOMstrings.incomeListContainer;
                 html = '<div class="item clearfix" id="inc-%id%" draggable="true"><div class="item__description">%description%</div><div class="right clearfix"><div class="item__value">%value%</div><div class="item__delete"><button class="item__delete--btn"><i class="ion-ios-close-outline"></i></button></div></div></div>';
             }
             else
             {
-                element = DOMstrings.expensesContainer;
+                element = DOMstrings.expensesListContainer;
                 html = '<div class="item clearfix" id="exp-%id%" draggable="true"><div class="item__description">%description%</div><div class="right clearfix"><div class="item__value">%value%</div><div class="item__percentage">21%</div><div class="item__delete"><button class="item__delete--btn"><i class="ion-ios-close-outline"></i></button></div></div></div>';
             }
 
@@ -260,6 +286,18 @@ var UIController = (function() {
             // In JS, we can only delete a child.
             var el = document.getElementById(selectorID);
             el.parentNode.removeChild(el);
+        },
+
+        deleteLists: function() {
+            type=[DOMstrings.incomeListContainer, DOMstrings.expensesListContainer];
+            for(var i=0; i < type.length; i++)
+            {
+                var node = document.querySelector(type[i]);
+                while(node.firstChild)
+                {
+                    node.removeChild(node.firstChild);
+                }
+            }
         },
 
         clearFields: function() {
@@ -408,6 +446,8 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
 
             addAllItems('inc');
             addAllItems('exp');
+
+            updatePercentages();
         }
         else
         {
@@ -426,6 +466,8 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
         var DOM = UICtrl.getDOMstrings();
 
         document.querySelector(DOM.inputBtn).addEventListener('click', ctrlAddItem);
+
+        document.querySelector(DOM.resetBtn).addEventListener('click', ctrlClearAll)
 
         // Detects any key press.
         document.addEventListener('keypress', function(event) {
@@ -457,7 +499,6 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
 
         // 2. Return the budget
         var budget = budgetCtrl.getBudget();
-        // console.log(budget);
 
         // 3. Display the budget on the UI
         UICtrl.displayBudget(budget);
@@ -472,7 +513,6 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
         var percentages = budgetCtrl.getPercentages();
 
         // 3. Update the UI with the new percentages.
-        // console.log(percentages);
         UICtrl.displayPercentages(percentages);
     };
 
@@ -502,7 +542,6 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
             storageCtrl.store(budgetCtrl.getData());
         }
         
-
         console.log('It works!');
     }
 
@@ -534,6 +573,23 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
             // 5. Store data in localstorage
             storageCtrl.store(budgetCtrl.getData());
         }
+    };
+
+    var ctrlClearAll = function(event) {
+        // 1. Remove/Empty the datastructure in the budget controller
+        budgetController.clearItems();
+
+        // 2. Update UI items
+        UICtrl.deleteLists();
+
+        // 3. Update and show budget
+        updateBudget();
+
+        // 4. Update and show percentages - MIGHT NOT NEED THIS
+        // updatePercentages();
+
+        // 5. Clear local storage
+        storageCtrl.clearData();
     };
 
     // Event when dragged over an element. Check coordinates. - dragStart

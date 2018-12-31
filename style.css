@@ -152,6 +152,20 @@ body {
 .add__description { width: 400px;}
 .add__value { width: 100px;}
 
+.add__reset__btn {
+    font-size: 35px;
+    background: none;
+    /* border: none; */
+    border-radius: 8px;
+    color: rgb(28, 128, 28);
+    border-color: rgb(28, 128, 28);
+    cursor: pointer;
+    display: inline-block;
+    vertical-align: middle;
+    line-height: 1.1;
+    margin-left: 20px;
+}
+
 .add__btn {
     font-size: 35px;
     background: none;
@@ -164,7 +178,7 @@ body {
     margin-left: 10px;
 }
 
-.add__btn:active { transform: translateY(2px); }
+.add__btn:active, .add__reset__btn:active { transform: translateY(2px); }
 
 .add__type:focus,
 .add__description:focus,
@@ -173,7 +187,7 @@ body {
     border: 1px solid #28B9B5;
 }
 
-.add__btn:focus { outline: none; }
+.add__btn:focus, .add__reset__btn:focus { outline: none; }
 
 /***** LISTS *****/
 .container {
