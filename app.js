@@ -1,6 +1,6 @@
-// TODO
-//  2. Local storage does not display initial percentages correctly,
-
+// IDEAS:
+//      1. Drag & drop change object order display over same list (+ dragover cursor)
+//      2. Switching images on the background
 
 var budgetController = (function() {
     var Expense = function(id, description, value) {
@@ -155,7 +155,6 @@ var budgetController = (function() {
         calcPercentages: function() {
 
             data.allItems.exp.forEach(function(current) {
-                console.log(current);
                 current.calculatePercentage(data.totals.inc);
             });
         }, 
@@ -519,7 +518,6 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
     var ctrlAddItem = function() {
         // 1. Get the filed input data.
         var input = UICtrl.getInput();
-        // console.log(info)
 
         if(input.description !== ""   &&   !isNaN(input.value)   &&   input.value > 0 )
         {
@@ -585,10 +583,7 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
         // 3. Update and show budget
         updateBudget();
 
-        // 4. Update and show percentages - MIGHT NOT NEED THIS
-        // updatePercentages();
-
-        // 5. Clear local storage
+        // 4. Clear local storage
         storageCtrl.clearData();
     };
 
