@@ -1,3 +1,7 @@
+// TODO:
+//      Make the images switch automatically.
+
+
 var slideController = (function() {
     var galery = {
         image: [0,1,2,3],
@@ -145,11 +149,30 @@ var appController = (function(slideCtrl, UIctrl) {
         }
     };
 
+    var autoSlide = function() {
+        var currentIndex, newIndex;
+
+        // 1. Get current index
+        currentIndex = slideCtrl.getImageIndex();
+
+        // 2. Update current index/datastructure
+        slideCtrl.addToIndex(1);
+
+        // 3. Get new index
+        newIndex = slideCtrl.getImageIndex();
+
+        // 3. Switch in UI
+        UIctrl.switch(currentIndex, newIndex);
+
+        setTimeout(autoSlide, 3000);
+    };
+
     return {
         init: function() {
             // Display initial Image
             UIctrl.setup();
-            setEventListeners();
+            setEventListeners();;
+            autoSlide();
         },
     }
 
