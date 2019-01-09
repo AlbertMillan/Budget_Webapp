@@ -621,7 +621,7 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
             var newItem = budgetCtrl.switchItem(draggedItem.type, draggedItem.ID);
 
             // 2. Delete the item from the UI
-            UIController.deleteListItem(draggedItem.type + '-' + draggedItem.ID);
+            UICtrl.deleteListItem(draggedItem.type + '-' + draggedItem.ID);
 
             // 3. Add the item to the UI dropped column
             UICtrl.addListItem(newItem, inversedType);

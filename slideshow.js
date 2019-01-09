@@ -1,6 +1,4 @@
 // TODO:
-//      Make the images switch automatically.
-
 
 var slideController = (function() {
     var galery = {
@@ -95,6 +93,20 @@ var UIController = (function() {
 
 var appController = (function(slideCtrl, UIctrl) {
 
+    var timeout;
+
+    var startTimeout = function() {
+        if(timeout === 0 || typeof timeout === 'undefined')
+        {
+            timeout = setInterval(autoSlide, 3000);
+        }
+    };
+
+    var clearTimeout = function() {
+        clearInterval(timeout);
+        timeout = 0;
+    };
+
     var setEventListeners = function() {
         var DOM = UIctrl.getDOMstrings();
 
@@ -107,12 +119,11 @@ var appController = (function(slideCtrl, UIctrl) {
         document.querySelectorAll(DOM.slideBtn).forEach(function(element) {
             element.addEventListener('click', slideTo);
         });
-
         // c) Drag?
     };
 
     // Slide left/right by one unit
-    var slide = function(event) {
+    var slide = async function(event) {
         var elementID, operation, newIndex;
         // 1. Get element that was clicked
         elementID = event.target.id;
@@ -125,6 +136,9 @@ var appController = (function(slideCtrl, UIctrl) {
 
         // 3. Display on screen
         UIctrl.switch(oldIndex, newIndex);
+
+        clearInterval(timeout);
+        startTimeout();
     };
 
     // Slide to image in unit
@@ -147,6 +161,9 @@ var appController = (function(slideCtrl, UIctrl) {
             // 5. Display on screen
             UIctrl.switch(currentIndex, id);
         }
+
+        clearInterval(timeout);
+        startTimeout();
     };
 
     var autoSlide = function() {
@@ -164,15 +181,17 @@ var appController = (function(slideCtrl, UIctrl) {
         // 3. Switch in UI
         UIctrl.switch(currentIndex, newIndex);
 
-        setTimeout(autoSlide, 3000);
+        // manageTimeout().setTimeout();
+        startTimeout();
     };
+    
 
     return {
         init: function() {
             // Display initial Image
             UIctrl.setup();
             setEventListeners();;
-            autoSlide();
+            startTimeout();
         },
     }
 
