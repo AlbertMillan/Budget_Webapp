@@ -95,14 +95,14 @@ var appController = (function(slideCtrl, UIctrl) {
 
     var timeout;
 
-    var startTimeout = function() {
+    var startTimer = function() {
         if(timeout === 0 || typeof timeout === 'undefined')
         {
             timeout = setInterval(autoSlide, 3000);
         }
     };
 
-    var clearTimeout = function() {
+    var clearTimer = function() {
         clearInterval(timeout);
         timeout = 0;
     };
@@ -137,8 +137,8 @@ var appController = (function(slideCtrl, UIctrl) {
         // 3. Display on screen
         UIctrl.switch(oldIndex, newIndex);
 
-        clearInterval(timeout);
-        startTimeout();
+        clearTimer();
+        startTimer();
     };
 
     // Slide to image in unit
@@ -162,8 +162,8 @@ var appController = (function(slideCtrl, UIctrl) {
             UIctrl.switch(currentIndex, id);
         }
 
-        clearInterval(timeout);
-        startTimeout();
+        clearTimer();
+        startTimer();
     };
 
     var autoSlide = function() {
@@ -182,16 +182,16 @@ var appController = (function(slideCtrl, UIctrl) {
         UIctrl.switch(currentIndex, newIndex);
 
         // manageTimeout().setTimeout();
-        startTimeout();
+        startTimer();
     };
-    
+
 
     return {
         init: function() {
             // Display initial Image
             UIctrl.setup();
             setEventListeners();;
-            startTimeout();
+            startTimer();
         },
     }
 

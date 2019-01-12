@@ -1,6 +1,14 @@
-// IDEAS:
+// TODO:
 //      1. Drag & drop change object order display over same list (+ dragover cursor)
-//      2. Switching images on the background
+//          a. It is partially working if you assume that IDs are always kept in 
+//              order even when moving their position around (updating the ID). If
+//              I don't use this, consider all the functions that could be removed...
+//          b. It would be more efficient to get the position by looking at the UI 
+//              childnodes, and based on that swap the positions. Would be less 
+//              computing intense.
+
+//      2. Use slideshow to create new budgets and alter between them. Store them
+//          in the localstorate
 
 var budgetController = (function() {
     var Expense = function(id, description, value) {
@@ -23,12 +31,20 @@ var budgetController = (function() {
 
     Expense.prototype.getPercentage = function() {
         return this.percentage;
-    }
+    };
+
+    Expense.prototype.updateID = function(id) {
+        this.id = id;
+    };
 
     var Income = function(id, description, value) {
         this.id = id;
         this.description = description;
         this.value = value;
+    };
+
+    Income.prototype.updateID = function(id) {
+        this.id = id;
     };
 
     var calculateTotal = function(type) {
@@ -56,6 +72,27 @@ var budgetController = (function() {
         return ids.indexOf(ID);
     };
 
+    var getBiggestInArr = function(arr) {
+        var highest = 0;
+
+        arr.forEach(function(current, index) {
+            if(current.id > highest)
+            {
+                highest = current.id;
+            }
+        });
+
+        return (highest+1);
+    };
+
+    // var updateIDs = function(type, a, b) {
+    //     console.log(a, b);
+    //     for(var i=a; i <= b; i++)
+    //     {
+    //         data.allItems[type][i].updateID(i);
+    //     }
+    // };
+
 
     var data = {
         allItems: {
@@ -75,10 +112,13 @@ var budgetController = (function() {
         addItem: function(type, des, val) {
             var newItem, ID;
 
-            // Create new ID
+            // Create new ID, assumes elements are in order
             if(data.allItems[type].length > 0)
             {
-                ID = data.allItems[type][data.allItems[type].length-1].id + 1;
+                // Get highest ID in the array, it can be unordered so you have 
+                // no guarantee that it will be the last item
+                // ID = data.allItems[type][data.allItems[type].length-1].id + 1;
+                ID = getBiggestInArr(data.allItems[type]);
             }
             else
             {
@@ -199,6 +239,24 @@ var budgetController = (function() {
             data.budget = obj.budget;
         },
 
+        rearrangeOrder: function(type, sourcePos, destinationPos) {
+            var element;
+            
+            // 1. Store the element in a temp variable
+            element = data.allItems[type][sourcePos];
+
+            // 2. Delete element in temp variable
+            deleteEl(type, sourcePos);
+
+            // 3. Add item at pos
+            data.allItems[type].splice(destinationPos, 0, element);
+            // console.log(element);
+
+            // 4. Update IDs to match order
+            // console.log(sourcePos, destinationPos);
+            // destinationPos < sourcePos ? updateIDs(type, destinationPos, sourcePos) : updateIDs(type, sourcePos, destinationPos);
+        },
+
         testing: function() {
             console.log(data);
         }
@@ -207,7 +265,7 @@ var budgetController = (function() {
 })();
 
 
-https://developer.mozilla.org/en-US/docs/Web/API/Element/insertAdjacentHTML
+// https://developer.mozilla.org/en-US/docs/Web/API/Element/insertAdjacentHTML
 var UIController = (function() {
     
     var DOMstrings = {
@@ -287,17 +345,18 @@ var UIController = (function() {
             el.parentNode.removeChild(el);
         },
 
-        deleteLists: function() {
-            type=[DOMstrings.incomeListContainer, DOMstrings.expensesListContainer];
-            for(var i=0; i < type.length; i++)
+        deleteList: function(type) {
+            var label, node;
+
+            label = (type === 'inc' ? DOMstrings.incomeListContainer : DOMstrings.expensesListContainer);
+            node = document.querySelector(label);
+
+            while(node.firstChild)
             {
-                var node = document.querySelector(type[i]);
-                while(node.firstChild)
-                {
-                    node.removeChild(node.firstChild);
-                }
+                node.removeChild(node.firstChild);
             }
         },
+
 
         clearFields: function() {
             var fields;
@@ -372,12 +431,43 @@ var UIController = (function() {
             document.querySelector(DOMstrings.inputBtn).classList.toggle('red');
         },
 
+        // Returns index of in node hierarchy of element with label 'elementLabel'
+        getHTMLElement: function(elementLabel) {
+            return document.getElementById(elementLabel);
+
+            // return [].indexOf.call(el.parentNode.children, el);
+        },
+
+        // getDestinationIndex: function(elementLabel, min, max) {
+        //     var parent, itemRect, index, res;
+            
+        //     elements = document.getElementById(elementLabel).parentNode.children;
+        //     res = -1;
+        //     index = min;
+
+        //     while( index < max && res === -1)
+        //     {
+        //         itemRect = elements[index].getBoundingClientRect();
+        //         index++;
+        //     }
+        // },
+
         // Returns the dimensions of the opposite container of column type.
-        getContainerDimensions: function(type) {
-            var label;
+        getContainerDimensions: function(itemType, refType) {
+            var label, element;
+
+            switch(itemType)
+            {
+                case 'inc': label = DOMstrings.incomeContainer;  break;
+                case 'exp': label = DOMstrings.expenseContainer; break;
+                default:    label = itemType;
+            }
+
+            element = (refType === 'class' ? document.querySelector(label) : document.getElementById(label));
+
             // label = (type === 'inc' ? DOMstrings.incomeContainer : DOMstrings.expenseContainer);
-            label = (type === 'inc' ? DOMstrings.expenseContainer : DOMstrings.incomeContainer);
-            return document.querySelector(label).getBoundingClientRect();
+            // label = (type === 'inc' ? DOMstrings.expenseContainer : DOMstrings.incomeContainer);
+            return element.getBoundingClientRect();
         },
 
         getDOMstrings: function() {
@@ -428,6 +518,13 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
 
     var draggedItem;
 
+    var addAllItems = function(type, data) {
+        for(var i=0; i < data.allItems[type].length; i++)
+        {
+            UICtrl.addListItem(data.allItems[type][i], type);
+        }
+    };
+
     var setupStorage = function() {
         if(!storageCtrl.isEmpty())
         {
@@ -436,15 +533,8 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
             // console.log(data);
             UICtrl.displayBudget(budgetCtrl.getBudget());
 
-            var addAllItems = function(type) {
-                for(var i=0; i < data.allItems[type].length; i++)
-                {
-                    UICtrl.addListItem(data.allItems[type][i], type);
-                }
-            };
-
-            addAllItems('inc');
-            addAllItems('exp');
+            addAllItems('inc', data);
+            addAllItems('exp', data);
 
             updatePercentages();
         }
@@ -488,6 +578,7 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
         document.querySelector(DOM.container).addEventListener('dragstart', ctrlDragItem);
         // document.querySelector(DOM.container).addEventListener('drop', drop);
         document.querySelector(DOM.container).addEventListener('dragend', ctrlToggleItem);
+        document.querySelector(DOM.container).addEventListener('dragend', ctrlRearrangeItem);
 
         document.querySelector(DOM.inputType).addEventListener('change', UICtrl.changedType);
     };
@@ -560,7 +651,7 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
             budgetCtrl.deleteItem(type,ID);
 
             // 2. Delete the item from the UI dragged column
-            UIController.deleteListItem(itemID);
+            UICtrl.deleteListItem(itemID);
 
             // 3. Update and show the new budget
             updateBudget();
@@ -578,7 +669,8 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
         budgetController.clearItems();
 
         // 2. Update UI items
-        UICtrl.deleteLists();
+        UICtrl.deleteList('inc');
+        UICtrl.deleteList('exp');
 
         // 3. Update and show budget
         updateBudget();
@@ -598,21 +690,26 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
         draggedItem = {
             type: splitID[0],
             ID: parseInt(splitID[1]),
+            rect: {
+                x: event.x,
+                y: event.y,
+            }
         }
         
     };
 
     // Event when it drops check square window
     var ctrlToggleItem = function(event) {
+        // console.log(event);
         var rect, inversedType;
 
         // 1. Get type of the container where item is dropped (inc/exp)
         inversedType = (draggedItem.type === 'inc' ? 'exp' : 'inc');
 
-        // 2. Get dimensions of the opposing column.
-        rect = UICtrl.getContainerDimensions(draggedItem.type);
+        // 2. Get dimensions of the container where item is dropped.
+        rect = UICtrl.getContainerDimensions(inversedType, 'class');
 
-        // Check Square dropped within the container
+        // Check Square dropped within the opposite container
         if(event.x >= rect.left && event.x <= rect.right  &&
            event.y >= rect.top  && event.y <= rect.bottom
           )
@@ -636,6 +733,166 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
             storageCtrl.store(budgetCtrl.getData());
         }
     };
+
+    // Event when dropped on same container but above or below its original position in the item list.
+    var ctrlRearrangeItem = function(event) {
+        var typeRect;
+
+        // 1. Get dimensions of the container where item is dropped
+        typeRect = UICtrl.getContainerDimensions(draggedItem.type, 'class');
+
+        // 2. Check if item is dropped within the its same container
+        if(event.x >= typeRect.left && event.x <= typeRect.right  &&
+            event.y >= typeRect.top  && event.y <= typeRect.bottom
+           )
+         {
+            var element, source, max, min, res;
+
+            // 3. Check if the element's dropping y-coordinate is smaller than its original y-coordinate position
+            if( event.y < draggedItem.rect.y )
+            {
+                // 4. Get index of element who's position is to be swapped with.
+                console.log('Below');
+                element = UICtrl.getHTMLElement(draggedItem.type + '-' + draggedItem.ID);
+                max = [].indexOf.call(element.parentNode.children, element);
+                min = 0;
+                res = getIndex(min, max, element.parentNode.children, 0);
+                source = max;
+            }
+            else
+            {
+                console.log('Above');
+                element = UICtrl.getHTMLElement(draggedItem.type + '-' + draggedItem.ID);
+                max = budgetCtrl.getData().allItems[draggedItem.type].length;
+                min = [].indexOf.call(element.parentNode.children, element);
+                res = getIndex(min, max, element.parentNode.children, 1);
+                source = min;
+            }
+
+            // 5. Update data structure
+            budgetCtrl.rearrangeOrder(draggedItem.type, source, res);
+            data = budgetCtrl.getData();
+
+            // 6. Delete current lists
+            UICtrl.deleteList(draggedItem.type);
+
+            // 7. Display newly-ordered budget
+            addAllItems(draggedItem.type, data);
+
+            // 8. Update percentages
+            updatePercentages();
+
+            // 8. Store data in localstorage
+            storageCtrl.store(data);
+         }
+    };
+
+
+    var getIndex = function(min, max, elements, category) {
+        var action = function(a, b) {
+            return (a < b ? true : false);
+        };
+
+        var res, index, itemRect;
+
+        res = -1;
+        index = min;
+        // console.log(res, index, max);
+
+        // Loops until position is found or all possible positions have been considered.
+        while( index < max && res === -1)
+        {
+            // 2. Get element's coordinates
+            itemRect = elements[index].getBoundingClientRect();
+
+            // 3. a) Check if potential positions are below or above, b) then determine whether position is found
+            if( category === 0 ? action( event.y, itemRect.bottom ) : (action( itemRect.top, event.y ) && action( event.y, itemRect.bottom) ) )
+            {
+                res = index;
+            }
+
+            index++;
+        }
+        
+        return res;
+    };
+
+
+    // var getIndex = function(min, max, category) {
+
+    //     var action = function(a, b) {
+    //         return (a < b ? true : false);
+    //     };
+    //     console.log(min, max, category);
+    //     var res, index, itemRect;
+
+    //     res = -1;
+    //     index = min;
+    //     // console.log(res, index, max);
+
+    //     // Loops until position is found or all possible positions have been considered.
+    //     while( index < max && res === -1)
+    //     {
+    //         // 2. Get element's coordinates
+    //         itemRect = UICtrl.getContainerDimensions(draggedItem.type+ '-' +index, 'id');
+    //         console.log(event.y, itemRect.top, itemRect.bottom);
+    //         // 3. a) Check if potential positions are below or above, b) then determine whether position is found
+    //         if( category === 0 ? action( event.y, itemRect.bottom ) : (action( itemRect.top, event.y ) && action( event.y, itemRect.bottom) ) )
+    //         {
+    //             res = index;
+    //         }
+
+    //         index++;
+    //     }
+    //     return res;
+    // };
+
+
+    // // Event when dropped on same container but above or below its original position in the item list.
+    // var ctrlRearrangeItem = function(event) {
+    //     var typeRect;
+
+    //     // 1. Get dimensions of the container where item is dropped
+    //     typeRect = UICtrl.getContainerDimensions(draggedItem.type, 'class');
+
+    //     // 2. Check if item is dropped within the its same container
+    //     if(event.x >= typeRect.left && event.x <= typeRect.right  &&
+    //         event.y >= typeRect.top  && event.y <= typeRect.bottom
+    //        )
+    //      {
+    //         var max, min, res;
+
+    //         // 3. Check if the element's dropping y-coordinate is smaller than its original y-coordinate position
+    //         if( event.y < draggedItem.rect.y )
+    //         {
+    //             // 4. Get index of element who's position is to be swapped with.
+    //             console.log('Below');
+    //             max = draggedItem.ID;
+    //             min = 0;
+    //             res = getIndex(min, max, 0);
+    //         }
+    //         else
+    //         {
+    //             console.log('Above');
+    //             max = budgetCtrl.getData().allItems[draggedItem.type].length;
+    //             min = draggedItem.ID+1;
+    //             res = getIndex(min, max, 1);
+    //         }
+
+    //         // 5. Update data structure
+    //         budgetCtrl.rearrangeOrder(draggedItem.type, draggedItem.ID, res);
+    //         data = budgetCtrl.getData();
+
+    //         // 6. Delete current lists
+    //         UICtrl.deleteList(draggedItem.type);
+
+    //         // 7. Display newly-ordered budget
+    //         addAllItems(draggedItem.type, data);
+
+    //         // 8. Store data in localstorage
+    //         // storageCtrl.store(data);
+    //      }
+    // };
 
     return {
         init: function() {
