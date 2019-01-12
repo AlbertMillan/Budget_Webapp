@@ -85,15 +85,6 @@ var budgetController = (function() {
         return (highest+1);
     };
 
-    // var updateIDs = function(type, a, b) {
-    //     console.log(a, b);
-    //     for(var i=a; i <= b; i++)
-    //     {
-    //         data.allItems[type][i].updateID(i);
-    //     }
-    // };
-
-
     var data = {
         allItems: {
             exp: [],
@@ -250,11 +241,6 @@ var budgetController = (function() {
 
             // 3. Add item at pos
             data.allItems[type].splice(destinationPos, 0, element);
-            // console.log(element);
-
-            // 4. Update IDs to match order
-            // console.log(sourcePos, destinationPos);
-            // destinationPos < sourcePos ? updateIDs(type, destinationPos, sourcePos) : updateIDs(type, sourcePos, destinationPos);
         },
 
         testing: function() {
@@ -434,23 +420,7 @@ var UIController = (function() {
         // Returns index of in node hierarchy of element with label 'elementLabel'
         getHTMLElement: function(elementLabel) {
             return document.getElementById(elementLabel);
-
-            // return [].indexOf.call(el.parentNode.children, el);
         },
-
-        // getDestinationIndex: function(elementLabel, min, max) {
-        //     var parent, itemRect, index, res;
-            
-        //     elements = document.getElementById(elementLabel).parentNode.children;
-        //     res = -1;
-        //     index = min;
-
-        //     while( index < max && res === -1)
-        //     {
-        //         itemRect = elements[index].getBoundingClientRect();
-        //         index++;
-        //     }
-        // },
 
         // Returns the dimensions of the opposite container of column type.
         getContainerDimensions: function(itemType, refType) {
@@ -604,6 +574,35 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
 
         // 3. Update the UI with the new percentages.
         UICtrl.displayPercentages(percentages);
+    };
+
+    var getIndex = function(min, max, elements, category) {
+        var action = function(a, b) {
+            return (a < b ? true : false);
+        };
+
+        var res, index, itemRect;
+
+        res = -1;
+        index = min;
+        // console.log(res, index, max);
+
+        // Loops until position is found or all possible positions have been considered.
+        while( index < max && res === -1)
+        {
+            // 2. Get element's coordinates
+            itemRect = elements[index].getBoundingClientRect();
+
+            // 3. a) Check if potential positions are below or above, b) then determine whether position is found
+            if( category === 0 ? action( event.y, itemRect.bottom ) : (action( itemRect.top, event.y ) && action( event.y, itemRect.bottom) ) )
+            {
+                res = index;
+            }
+
+            index++;
+        }
+
+        return res;
     };
 
     var ctrlAddItem = function() {
@@ -787,112 +786,6 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
          }
     };
 
-
-    var getIndex = function(min, max, elements, category) {
-        var action = function(a, b) {
-            return (a < b ? true : false);
-        };
-
-        var res, index, itemRect;
-
-        res = -1;
-        index = min;
-        // console.log(res, index, max);
-
-        // Loops until position is found or all possible positions have been considered.
-        while( index < max && res === -1)
-        {
-            // 2. Get element's coordinates
-            itemRect = elements[index].getBoundingClientRect();
-
-            // 3. a) Check if potential positions are below or above, b) then determine whether position is found
-            if( category === 0 ? action( event.y, itemRect.bottom ) : (action( itemRect.top, event.y ) && action( event.y, itemRect.bottom) ) )
-            {
-                res = index;
-            }
-
-            index++;
-        }
-        
-        return res;
-    };
-
-
-    // var getIndex = function(min, max, category) {
-
-    //     var action = function(a, b) {
-    //         return (a < b ? true : false);
-    //     };
-    //     console.log(min, max, category);
-    //     var res, index, itemRect;
-
-    //     res = -1;
-    //     index = min;
-    //     // console.log(res, index, max);
-
-    //     // Loops until position is found or all possible positions have been considered.
-    //     while( index < max && res === -1)
-    //     {
-    //         // 2. Get element's coordinates
-    //         itemRect = UICtrl.getContainerDimensions(draggedItem.type+ '-' +index, 'id');
-    //         console.log(event.y, itemRect.top, itemRect.bottom);
-    //         // 3. a) Check if potential positions are below or above, b) then determine whether position is found
-    //         if( category === 0 ? action( event.y, itemRect.bottom ) : (action( itemRect.top, event.y ) && action( event.y, itemRect.bottom) ) )
-    //         {
-    //             res = index;
-    //         }
-
-    //         index++;
-    //     }
-    //     return res;
-    // };
-
-
-    // // Event when dropped on same container but above or below its original position in the item list.
-    // var ctrlRearrangeItem = function(event) {
-    //     var typeRect;
-
-    //     // 1. Get dimensions of the container where item is dropped
-    //     typeRect = UICtrl.getContainerDimensions(draggedItem.type, 'class');
-
-    //     // 2. Check if item is dropped within the its same container
-    //     if(event.x >= typeRect.left && event.x <= typeRect.right  &&
-    //         event.y >= typeRect.top  && event.y <= typeRect.bottom
-    //        )
-    //      {
-    //         var max, min, res;
-
-    //         // 3. Check if the element's dropping y-coordinate is smaller than its original y-coordinate position
-    //         if( event.y < draggedItem.rect.y )
-    //         {
-    //             // 4. Get index of element who's position is to be swapped with.
-    //             console.log('Below');
-    //             max = draggedItem.ID;
-    //             min = 0;
-    //             res = getIndex(min, max, 0);
-    //         }
-    //         else
-    //         {
-    //             console.log('Above');
-    //             max = budgetCtrl.getData().allItems[draggedItem.type].length;
-    //             min = draggedItem.ID+1;
-    //             res = getIndex(min, max, 1);
-    //         }
-
-    //         // 5. Update data structure
-    //         budgetCtrl.rearrangeOrder(draggedItem.type, draggedItem.ID, res);
-    //         data = budgetCtrl.getData();
-
-    //         // 6. Delete current lists
-    //         UICtrl.deleteList(draggedItem.type);
-
-    //         // 7. Display newly-ordered budget
-    //         addAllItems(draggedItem.type, data);
-
-    //         // 8. Store data in localstorage
-    //         // storageCtrl.store(data);
-    //      }
-    // };
 
     return {
         init: function() {
