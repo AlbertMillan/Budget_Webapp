@@ -33,10 +33,18 @@ body {
 
 .top {
     height: 40vh;
+    background-image: linear-gradient(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.35)), url(assets/back.png);
     background-size: cover;
     background-position: center;
     position: relative;
     transition: 0.6s ease-in;
+}
+
+.new-budget__container {
+    position: absolute;
+    top: 10%;
+    left: 50%;
+    transform: translate(-50%, -50%);
 }
 
 .dot__container {
@@ -154,6 +162,24 @@ body {
 .arrow__btn:hover {
     background-color: rgba(0,0,0,0.8);
 }
+
+.budget__btn {
+    font-size: 28px;
+    background: none;
+    /* border: none; */
+    border-radius: 8px;
+    color: rgb(233, 233, 233);
+    border-color: rgb(233, 233, 233);
+    cursor: pointer;
+    display: inline-block;
+    vertical-align: middle;
+    line-height: 1.1;
+    padding: 2px;
+}
+
+.budget__btn:active { transform: translateY(2px); }
+
+.budget__btn:focus { outline: none; }
 
 
 /**********************************************

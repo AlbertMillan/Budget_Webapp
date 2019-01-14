@@ -57,9 +57,7 @@ var UIController = (function() {
 
     return {
         setup: function() {
-            var html, myState;
-
-            myState = "active";
+            var html;
 
             document.querySelector(DOMstrings.topContainer).style.backgroundImage = "url("+assetsPath+ImageStrings[0]+")";
 

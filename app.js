@@ -1,8 +1,5 @@
 // TODO:
 //      1. Drag & drop change object order display over same list (+ dragover cursor)
-//          a. It is partially working if you assume that IDs are always kept in 
-//              order even when moving their position around (updating the ID). If
-//              I don't use this, consider all the functions that could be removed...
 //          b. It would be more efficient to get the position by looking at the UI 
 //              childnodes, and based on that swap the positions. Would be less 
 //              computing intense.
@@ -11,6 +8,27 @@
 //          in the localstorate
 
 var budgetController = (function() {
+
+    var Budget = function(id, data) {
+        this.id = id;
+        this.data = {
+            allItems: {
+                exp: data.allItems.exp,
+                inc: data.allItems.inc
+            },
+            totals: {
+                exp: data.totals.exp,
+                inc: data.totals.inc
+            },
+            budget: data.budget,
+            percentage: data.percentage,
+        };
+    };
+
+    Budget.prototype.updateData = function(type, newItem) {
+        this.data.allItems[type].push(newItem);
+    };
+
     var Expense = function(id, description, value) {
         this.id = id;
         this.description = description;
@@ -33,40 +51,32 @@ var budgetController = (function() {
         return this.percentage;
     };
 
-    Expense.prototype.updateID = function(id) {
-        this.id = id;
-    };
-
     var Income = function(id, description, value) {
         this.id = id;
         this.description = description;
         this.value = value;
     };
 
-    Income.prototype.updateID = function(id) {
-        this.id = id;
-    };
-
     var calculateTotal = function(type) {
         var sum = 0;
-        data.allItems[type].forEach(function(current) {
+        budgetManager.budgets[budgetManager.current].data.allItems[type].forEach(function(current) {
             sum += current.value;
         });
-        data.totals[type] = sum;
+        budgetManager.budgets[budgetManager.current].data.totals[type] = sum;
     };
 
     var deleteEl = function(type, index) {
         if(index !== -1)
         {
             // splice - index at which we want to remove. Number of elements to be removed.
-            data.allItems[type].splice(index, 1);
+            budgetManager.budgets[budgetManager.current].data.allItems[type].splice(index, 1);
         }
     };
 
     // Returns index of the element with ID.
     var getIndex = function(type, ID) {
         // map returns a new brand array of the size of allItems
-        var ids = data.allItems[type].map(function(current) {
+        var ids = budgetManager.budgets[budgetManager.current].data.allItems[type].map(function(current) {
             return current.id;
         });
         return ids.indexOf(ID);
@@ -85,6 +95,11 @@ var budgetController = (function() {
         return (highest+1);
     };
 
+    var budgetManager = {
+        budgets: [],
+        current: -1
+    };
+
     var data = {
         allItems: {
             exp: [],
@@ -100,16 +115,50 @@ var budgetController = (function() {
 
     // Returns all the functions that we want to be public.
     return {
+
+        addBudget: function() {
+            var newBudget, ID;
+
+            // 1. Generate new ID
+            if(budgetManager.budgets.length > 0)
+            {
+                ID = budgetManager.budgets[budgetManager.budgets.length - 1].id + 1;
+                budgetManager.current++;
+            }
+            else
+            {
+                ID = 0;
+                budgetManager.current = 0;
+            }
+
+            // 2. Clear current datastructure
+            data.allItems.exp = [];
+            data.allItems.inc = [];
+            data.totals.exp = 0;
+            data.totals.inc = 0;
+            data.budget = 0;
+            data.percentage = -1;
+
+            // 3. Generate new budget item
+            newBudget = new Budget(ID, data);
+
+            // 4. Push budget item into the budget manager array
+            budgetManager.budgets.push(newBudget);
+        },
+
+
         addItem: function(type, des, val) {
             var newItem, ID;
 
-            // Create new ID, assumes elements are in order
-            if(data.allItems[type].length > 0)
+            var myData = budgetManager.budgets[budgetManager.current].data;
+
+            // Create new ID, allows for disordered elements
+            if(myData.allItems[type].length > 0)
             {
                 // Get highest ID in the array, it can be unordered so you have 
                 // no guarantee that it will be the last item
                 // ID = data.allItems[type][data.allItems[type].length-1].id + 1;
-                ID = getBiggestInArr(data.allItems[type]);
+                ID = getBiggestInArr(myData.allItems[type]);
             }
             else
             {
@@ -127,7 +176,8 @@ var budgetController = (function() {
             }
 
             // where type is 'inc' or 'exp'
-            data.allItems[type].push(newItem);
+            budgetManager.budgets[budgetManager.current].updateData(type, newItem);
+
             return newItem;
         },
 
@@ -139,9 +189,14 @@ var budgetController = (function() {
             deleteEl(type, index);
         },
 
+        deleteBudget: function() {
+            budgetManager.budgets.splice(budgetManager.current, 1);
+            budgetManager.current--;
+        },
+
         clearItems: function(){
-            data.allItems.inc.length = 0;
-            data.allItems.exp.length = 0;
+            budgetManager.budgets[budgetManager.current].data.allItems.inc.length = 0;
+            budgetManager.budgets[budgetManager.current].data.allItems.exp.length = 0;
         },
 
         switchItem: function(type, ID) {
@@ -152,7 +207,7 @@ var budgetController = (function() {
             index = getIndex(type, ID);
 
             // 1. Get item info (description and value)
-            item = data.allItems[type][index];
+            item = budgetManager.budgets[budgetManager.current].data.allItems[type][index];
 
             // 2. Create new item with inversed type
             inversedType = (type === 'inc' ? 'exp' : 'inc');
@@ -169,82 +224,138 @@ var budgetController = (function() {
             calculateTotal('exp');
             calculateTotal('inc');
 
-            // Calculate the budget
-            data.budget = data.totals.inc - data.totals.exp;
+            var myData = budgetManager.budgets[budgetManager.current].data;
 
-            if(data.totals.inc > 0)
+            // Calculate the budget
+            myData.budget = myData.totals.inc - myData.totals.exp;
+
+            if(myData.totals.inc > 0)
             {
                 // Calculate the percentage of income spent
-                data.percentage = Math.round(data.totals.exp / data.totals.inc * 100);
+                myData.percentage = Math.round(myData.totals.exp / myData.totals.inc * 100);
             }
             else
             {
-                data.percentage = -1;
+                myData.percentage = -1;
             }
         },
 
         calcPercentages: function() {
-
-            data.allItems.exp.forEach(function(current) {
-                current.calculatePercentage(data.totals.inc);
+            var myData = budgetManager.budgets[budgetManager.current].data;
+            myData.allItems.exp.forEach(function(current) {
+                current.calculatePercentage(myData.totals.inc);
             });
         }, 
 
         getBudget: function() {
+            var dataStructure = budgetManager.budgets[budgetManager.current].data;
             return {
-                budget: data.budget,
-                totalInc: data.totals.inc,
-                totalExp: data.totals.exp,
-                percentage: data.percentage
+                budget: dataStructure.budget,
+                totalInc: dataStructure.totals.inc,
+                totalExp: dataStructure.totals.exp,
+                percentage: dataStructure.percentage
             };
+        },
+
+        getCurrentBudgetID: function() {
+            return budgetManager.current;
         },
 
         getPercentages: function() {
             // map - returns something to be stored in a variable.
-            var allPerc = data.allItems.exp.map(function(current) {
+            var allPerc = budgetManager.budgets[budgetManager.current].data.allItems.exp.map(function(current) {
                 return current.getPercentage();
             });
             return allPerc;
         },
 
         getData: function() {
-            return data;
+            // return data;
+            return budgetManager.budgets[budgetManager.current].data;
+        },
+
+        getBudgets: function() {
+            return budgetManager;
         },
 
         // JSON data does not store Expense nor Income objects, create them when
         //  importing data from the localStorage
         setData: function(obj) {
             type = ['exp','inc'];
-            for(var i=0; i < type.length; i++)
+
+            console.log(obj);
+
+
+            obj.budgets.forEach(function(budget, i) {
+                var myData = budget.data;
+                for(var j=0; j < type.length; j++)
+                {
+                    myData.allItems[type[j]].forEach(function(current, k) {
+                        var item = (
+                            type[j] === 'exp' ? 
+                                new Expense(current.id, current.description, current.value) :
+                                new Income(current.id, current.description, current.value)                   
+                        );
+                        data.allItems[type[j]][k] = item;
+                    });
+                    data.totals[type[j]] = myData.totals[type[j]];
+                }
+
+                data.budget = myData.budget;
+
+                // 3. Generate new budget item
+                newBudget = new Budget(i, data);
+
+                // TODO: Percentages could be missing
+
+                // 4. Push budget item into the budget manager array
+                budgetManager.budgets.push(newBudget);
+
+                // 5. Clear current data structure // DO I REALLY NEED THIS? TRY IT OUT
+                data.allItems.exp = [];
+                data.allItems.inc = [];
+            });
+
+            budgetManager.current = obj.budgets.length - 1;
+        },
+
+        updateIndex: function(operation) {
+            var res = budgetManager.current + operation;
+            if(res < 0)
             {
-                obj.allItems[type[i]].forEach(function(current, index) {
-                    var item = (
-                        type[i] === 'exp' ? 
-                            new Expense(current.id, current.description, current.value) :
-                            new Income(current.id, current.description, current.value)                   
-                    );
-                    data.allItems[type[i]][index] = item;
-                });
-                data.totals[type[i]] = obj.totals[type[i]];
+                budgetManager.current = budgetManager.budgets.length-1;
             }
-            data.budget = obj.budget;
+            else if ( res == budgetManager.budgets.length )
+            {
+                budgetManager.current = 0;
+            }
+            else
+            {
+                budgetManager.current = res;
+            }
         },
 
         rearrangeOrder: function(type, sourcePos, destinationPos) {
             var element;
+
+            var myData = budgetManager.budgets[budgetManager.current].data;
             
             // 1. Store the element in a temp variable
-            element = data.allItems[type][sourcePos];
+            element = myData.allItems[type][sourcePos];
 
             // 2. Delete element in temp variable
             deleteEl(type, sourcePos);
 
             // 3. Add item at pos
-            data.allItems[type].splice(destinationPos, 0, element);
+            myData.allItems[type].splice(destinationPos, 0, element);
         },
 
         testing: function() {
             console.log(data);
+        },
+
+        test: function() {
+            console.log(budgetManager);
         }
     };
     
@@ -260,13 +371,17 @@ var UIController = (function() {
         inputValue: '.add__value',
         inputBtn: '.add__btn',
         resetBtn: '.add__reset__btn',
+        arrowBtn: '.arrow__btn',
         incomeListContainer: '.income__list',
         expensesListContainer: '.expenses__list',
+        budgetAddBtn: 'budget__add',
+        budgetDelBtn: 'budget__del',
         budgetLabel: '.budget__value',
         incomeLabel: '.budget__income--value',
         expenseLabel: '.budget__expenses--value',
         percentageLabel: '.budget__expenses--percentage',
         itemPercentageLabel: '.item__percentage',
+        dotContainer: '.dot__container',
         container: '.container',
         monthLabel: '.budget__title--month',
         incomeContainer: '.income',
@@ -348,10 +463,10 @@ var UIController = (function() {
             var fields;
             fields = document.querySelectorAll(DOMstrings.inputDescripiton + ', ' + DOMstrings.inputValue);
             
-            // trick to conver fields into array
+            // trick to convert fields into array
             var fieldsArr = Array.prototype.slice.call(fields);
 
-            fieldsArr.forEach(function(current, index, array) {
+            fieldsArr.forEach(function(current) {
                 current.value = "";
             });
 
@@ -399,6 +514,45 @@ var UIController = (function() {
             year = now.getFullYear();
             month = now.getMonth();
             document.querySelector(DOMstrings.monthLabel).textContent = months[month] + ', ' + year;
+        },
+
+        displayDot: function(oldIndex, newIndex) {
+            var html, parent;
+
+            parent = document.querySelector(DOMstrings.dotContainer);
+
+            html = '<span class="dot active" id="dot-%id%"></span>';
+
+            // Remove highlight of previously selected dot
+            // console.log(oldIndex, newIndex);
+            if(oldIndex !== -1)
+            {
+                parent.children[oldIndex].classList.remove('active');
+            }
+
+            // Highlights first dot
+            html = html.replace('%id%', newIndex);
+
+            // Inserts dot at the bottom
+            parent.insertAdjacentHTML('beforeend', html);
+        },
+
+        deleteDot: function(oldIndex) {
+            var dotContainer;
+
+            dotContainer = document.querySelector(DOMstrings.dotContainer);
+
+            // 1. Highlight dot at previous index
+            dotContainer.children[oldIndex-1].classList.toggle('active');
+
+            // 2. Delete dot at index
+            dotContainer.removeChild(dotContainer.children[oldIndex]);
+        },
+
+        switchBudget: function(oldIndex, newIndex) {
+            var dotContainer = document.querySelector(DOMstrings.dotContainer).children;
+            dotContainer[oldIndex].classList.toggle('active');
+            dotContainer[newIndex].classList.toggle('active');
         },
 
         // When changing style, best way to do it is to add/remove classes.
@@ -452,18 +606,23 @@ var UIController = (function() {
 var storageController = (function() {
 
     var storage = {
-        key: 'data'
+        string:'data',
+        currentIndex: 'current',
+        key: 0
     };
 
     return {
         store: function(data) {
             // 1. Stored in the local storage.
-            localStorage.setItem(storage.key, JSON.stringify(data));
-            this.retrieveItem();
+            localStorage.setItem(storage.string, JSON.stringify(data));
         },
 
-        retrieveItem: function() {
-            return JSON.parse(localStorage.getItem(storage.key));
+        retrieveItems: function() {
+            return JSON.parse(localStorage.getItem(storage.string));
+        },
+
+        retrieveItem: function(key) {
+            return JSON.parse(localStorage.getItem(storage.string + key));
         },
 
         removeItem: function() {
@@ -475,7 +634,10 @@ var storageController = (function() {
         },
 
         isEmpty: function() {
-            return (localStorage.getItem(storage.key) === null ? true : false);
+            // return (localStorage.getItem(storage.key) === null ? true : false);
+            // console.log(localStorage.length);
+            return (localStorage.length > 0 ? false : true);
+            
         },
     }
 
@@ -488,37 +650,33 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
 
     var draggedItem;
 
-    var addAllItems = function(type, data) {
-        for(var i=0; i < data.allItems[type].length; i++)
-        {
-            UICtrl.addListItem(data.allItems[type][i], type);
-        }
-    };
-
     var setupStorage = function() {
+        
         if(!storageCtrl.isEmpty())
-        {
-            var data = storageCtrl.retrieveItem();
+        {  
+            // 1. Retrieve budget items from localStorage
+            var data = storageCtrl.retrieveItems();
             budgetCtrl.setData(data);
-            // console.log(data);
+
+            // 2. Draw dots
+            data.budgets.forEach(function(budget, index) {
+                UICtrl.displayDot(index-1, index);
+            });
+            
+            // 3. Display budget
             UICtrl.displayBudget(budgetCtrl.getBudget());
 
-            addAllItems('inc', data);
-            addAllItems('exp', data);
+            // 4. Display all exp/inc items
+            addAllItems('inc', data.budgets[data.current].data);
+            addAllItems('exp', data.budgets[data.current].data);
 
             updatePercentages();
         }
         else
         {
-            UICtrl.displayBudget({
-                budget: 0,
-                totalInc: 0,
-                totalExp: 0,
-                percentage: -1
-            });
+            ctrlAddBudget();
         }
     };
-
     
 
     var setupEventListeners = function() {
@@ -536,13 +694,21 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
                 console.log('ENTER pressed.');
                 ctrlAddItem();
             }
-            else if (event.keyCode === 109 || event.which === 109)
-            {
-                storageCtrl.deleteData();
-            }
+            // else if (event.keyCode === 109 || event.which === 109)
+            // {
+            //     storageCtrl.clearData();
+            // }
         });
 
         document.querySelector(DOM.container).addEventListener('click', ctrlDeleteItem);
+        
+        document.getElementById(DOM.budgetAddBtn).addEventListener('click', ctrlAddBudget);
+        document.getElementById(DOM.budgetDelBtn).addEventListener('click', ctrlDelBudget);
+
+        // a) Arrows (left, right) selected.
+        document.querySelectorAll(DOM.arrowBtn).forEach(function(element) {
+            element.addEventListener('click', ctrlSlide);
+        });
 
         // DRAGOVER
         document.querySelector(DOM.container).addEventListener('dragstart', ctrlDragItem);
@@ -605,6 +771,15 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
         return res;
     };
 
+
+    var addAllItems = function(type, data) {
+        for(var i=0; i < data.allItems[type].length; i++)
+        {
+            UICtrl.addListItem(data.allItems[type][i], type);
+        }
+    };
+
+
     var ctrlAddItem = function() {
         // 1. Get the filed input data.
         var input = UICtrl.getInput();
@@ -627,7 +802,7 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
             updatePercentages();
 
             // 7. Store data in localstorage
-            storageCtrl.store(budgetCtrl.getData());
+            storageCtrl.store(budgetCtrl.getBudgets());
         }
         
         console.log('It works!');
@@ -659,10 +834,71 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
             updatePercentages();
 
             // 5. Store data in localstorage
-            storageCtrl.store(budgetCtrl.getData());
+            storageCtrl.store(budgetCtrl.getBudgets());
         }
     };
 
+    var ctrlAddBudget = function() {
+        var oldIndex, newIndex;
+
+        // 1. Get currently selected budget index
+        oldIndex = budgetCtrl.getCurrentBudgetID();
+
+        // TODO: if there is an existing budget, I need to store it in the datastructure and remove the incoming lines
+
+        // 2. Create budget in data structure
+        budgetCtrl.addBudget();
+
+        // 3. Display budget in UI
+        UICtrl.displayBudget({
+            budget: 0,
+            totalInc: 0,
+            totalExp: 0,
+            percentage: -1
+        });
+
+        // 4. Get new index from newly generated budget
+        newIndex = budgetCtrl.getCurrentBudgetID();
+
+        // 5. Display dots & arrows in UI
+        UICtrl.displayDot(oldIndex, newIndex);
+
+        // 6. Clear data items from previous UI budget
+        UICtrl.deleteList('inc');
+        UICtrl.deleteList('exp');
+
+        // 7. Store it in localStorage
+        storageCtrl.store(budgetCtrl.getBudgets())
+    };
+
+    var ctrlDelBudget = function() {
+        var oldIndex = budgetCtrl.getCurrentBudgetID();
+
+        // 1. Update datastructure
+        budgetCtrl.deleteBudget();
+
+        // 2. Update Budget
+        updateBudget();
+
+        // 3. Update UI
+        UICtrl.deleteList('inc');
+        UICtrl.deleteList('exp');
+
+        // 4. Draw new items
+        data = budgetCtrl.getData();
+        addAllItems('inc', data);
+        addAllItems('exp', data);
+
+        // 5. Delete Dots
+        UICtrl.deleteDot(oldIndex);
+
+        // 3. Update localStorage
+        storageCtrl.store(budgetCtrl.getBudgets());
+
+
+    };
+
+    // TODO: delete all budgets with all its elements;
     var ctrlClearAll = function(event) {
         // 1. Remove/Empty the datastructure in the budget controller
         budgetController.clearItems();
@@ -676,6 +912,38 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
 
         // 4. Clear local storage
         storageCtrl.clearData();
+    };
+
+    var ctrlSlide = function(event) {
+        var elementID, operation, oldIndex, newIndex;
+        // 1. Get element that was clicked
+        elementID = event.target.id;
+        operation = (elementID === 'next' ? 1 : -1);
+
+        // 2. Update and get indices from datastructure
+        oldIndex = budgetCtrl.getCurrentBudgetID();
+        budgetCtrl.updateIndex(operation);
+        newIndex = budgetCtrl.getCurrentBudgetID();
+
+        // 3. Display on screen
+        UICtrl.switchBudget(oldIndex, newIndex);
+
+        // 4. Display updated budget
+        updateBudget();
+
+        // 5. Remove items
+        UICtrl.deleteList('inc');
+        UICtrl.deleteList('exp');
+
+        // 6. Draw new items
+        data = budgetCtrl.getData();
+        addAllItems('inc', data);
+        addAllItems('exp', data);
+
+        // 7. Update percentages
+        updatePercentages();
+
+        // TODO: STORE IN LOCALSTORAGE, ENSURE IT IS THE SAME SCREEN WHEN RETRIEVED
     };
 
     // Event when dragged over an element. Check coordinates. - dragStart
@@ -694,7 +962,6 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
                 y: event.y,
             }
         }
-        
     };
 
     // Event when it drops check square window
@@ -729,7 +996,7 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
             updatePercentages();
 
             // 6. Store data in localstorage
-            storageCtrl.store(budgetCtrl.getData());
+            storageCtrl.store(budgetCtrl.getBudgets());
         }
     };
 
@@ -770,19 +1037,19 @@ var controller = (function(budgetCtrl, UICtrl, storageCtrl) {
 
             // 5. Update data structure
             budgetCtrl.rearrangeOrder(draggedItem.type, source, res);
-            data = budgetCtrl.getData();
+            myBudgets = budgetCtrl.getBudgets();
 
             // 6. Delete current lists
             UICtrl.deleteList(draggedItem.type);
 
             // 7. Display newly-ordered budget
-            addAllItems(draggedItem.type, data);
+            addAllItems(draggedItem.type, myBudgets.budgets[myBudgets.current].data);
 
             // 8. Update percentages
             updatePercentages();
 
             // 8. Store data in localstorage
-            storageCtrl.store(data);
+            storageCtrl.store(myBudgets);
          }
     };
 
